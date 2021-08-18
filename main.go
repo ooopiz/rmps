@@ -1,22 +1,45 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io/ioutil"
+	"log"
 	"os"
-	"strings"
 
 	"github.com/xuri/excelize/v2"
 )
 
+func getTxtContent(txt string) []string {
+	file, err := os.Open(txt)
+
+	if err != nil {
+		log.Fatalf("failed opening file: %s", err)
+	}
+
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanLines)
+	var txtlines []string
+
+	for scanner.Scan() {
+		txtlines = append(txtlines, scanner.Text())
+	}
+
+	file.Close()
+
+	return txtlines
+	// for _, eachline := range txtlines {
+	// fmt.Println(eachline)
+	// }
+}
+
 func main() {
-	if len(os.Args) != 3 {
-		fmt.Println("arg1: excelfile, arg2: pwdfile")
+	if len(os.Args) != 2 {
+		fmt.Println("rmps filename.xlsx")
 		os.Exit(0)
 	}
 
 	xlsx := os.Args[1]
-	pwdfile := os.Args[2]
+	pwdfile := "password.txt"
 
 	if _, err := os.Stat(xlsx); os.IsNotExist(err) {
 		fmt.Println(xlsx + " does not exist")
@@ -27,24 +50,20 @@ func main() {
 		os.Exit(0)
 	}
 
-	fileIO, err := os.OpenFile(pwdfile, os.O_RDWR, 0600)
-	if err != nil {
-		panic(err)
+	txtlines := getTxtContent(pwdfile)
+	for _, eachline := range txtlines {
+		if eachline != "" {
+			f, err := excelize.OpenFile(xlsx, excelize.Options{Password: eachline})
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+			if err := f.Save(); err != nil {
+				fmt.Println(err)
+			}
+			fmt.Println("success")
+			break
+		}
 	}
-	defer fileIO.Close()
-	rawBytes, err := ioutil.ReadAll(fileIO)
-	if err != nil {
-		panic(err)
-	}
-	lines := strings.Split(string(rawBytes), "\n")
-	pwd := lines[0]
 
-	f, err := excelize.OpenFile(xlsx, excelize.Options{Password: pwd})
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	if err := f.Save(); err != nil {
-		fmt.Println(err)
-	}
 }
